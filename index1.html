@@ -1,0 +1,1070 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Sistema GPS - Ruta Anta ↔ Cusco</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', system-ui, sans-serif; }
+    body { overflow: hidden; background: #f0f2f5; }
+
+    .auth-container { min-height: 100vh; display: flex; align-items: center; justify-content: center; background: linear-gradient(135deg, #1a237e 0%, #0d47a1 100%); padding: 20px; }
+    .auth-card { background: white; border-radius: 16px; padding: 32px; width: 100%; max-width: 420px; box-shadow: 0 20px 60px rgba(0,0,0,0.3); }
+    .auth-header { text-align: center; margin-bottom: 24px; }
+    .auth-header h1 { color: #1a237e; font-size: 1.8em; margin-bottom: 4px; }
+    .auth-header p { color: #78909c; font-size: 0.9em; }
+    .tabs { display: flex; gap: 8px; margin-bottom: 24px; border-bottom: 2px solid #e0e0e0; }
+    .tab { flex: 1; padding: 12px; background: none; border: none; font-size: 0.95em; font-weight: 600; color: #90a4ae; cursor: pointer; border-bottom: 3px solid transparent; }
+    .tab.active { color: #1976d2; border-bottom-color: #1976d2; }
+    .auth-form { display: none; }
+    .auth-form.active { display: block; animation: fadeIn 0.3s; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    .form-group { margin-bottom: 16px; }
+    .form-group label { display: block; color: #546e7a; font-size: 0.85em; margin-bottom: 6px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+    .form-group input, .form-group select { width: 100%; padding: 12px; border: 1.5px solid #cfd8dc; border-radius: 8px; font-size: 0.95em; }
+    .form-group input:focus, .form-group select:focus { outline: none; border-color: #1976d2; }
+    .btn-primary { width: 100%; padding: 14px; background: #1976d2; color: white; border: none; border-radius: 8px; font-size: 1em; font-weight: 600; cursor: pointer; }
+    .btn-primary:hover { background: #1565c0; }
+    .error-msg, .msg { margin-top: 12px; text-align: center; font-size: 0.9em; min-height: 20px; }
+
+    .admin-header { background: linear-gradient(135deg, #1a237e 0%, #283593 100%); color: white; padding: 16px 30px; display: flex; justify-content: space-between; align-items: center; }
+    .admin-header h1 { font-size: 1.4em; }
+    .header-actions { display: flex; align-items: center; gap: 16px; }
+    .user-info { font-size: 0.9em; opacity: 0.9; }
+    .btn-logout { background: rgba(255,255,255,0.15); color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: 600; }
+    .admin-container { display: grid; grid-template-columns: 450px 1fr; gap: 20px; padding: 20px; max-width: 1600px; margin: 0 auto; height: calc(100vh - 70px); }
+    .admin-sidebar { overflow-y: auto; }
+    .card { background: white; border-radius: 12px; padding: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); margin-bottom: 16px; }
+    .card h2 { color: #1a237e; margin-bottom: 16px; font-size: 1.1em; border-bottom: 2px solid #e8eaf6; padding-bottom: 8px; }
+    .instructions { background: #e3f2fd; border-left: 4px solid #1976d2; }
+    .instructions ol { padding-left: 20px; color: #1565c0; font-size: 0.9em; line-height: 1.8; }
+    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .form-actions { display: flex; gap: 10px; margin-top: 16px; }
+    .btn-secondary { flex: 1; padding: 12px; background: #f5f5f5; color: #666; border: 1.5px solid #ddd; border-radius: 6px; font-size: 0.95em; font-weight: 600; cursor: pointer; }
+    .stops-list { max-height: 450px; overflow-y: auto; }
+    .stop-item { display: flex; align-items: center; justify-content: space-between; padding: 12px; border-radius: 8px; margin-bottom: 8px; background: #f8f9fa; border-left: 4px solid #1976d2; cursor: move; transition: all 0.2s; }
+    .stop-item:hover { background: #e3f2fd; }
+    .stop-item.terminal-start { border-left-color: #2e7d32; background: #e8f5e9; }
+    .stop-item.terminal-end { border-left-color: #c62828; background: #ffebee; }
+    .stop-item.direction-outbound { border-left-color: #1976d2; }
+    .stop-item.direction-return { border-left-color: #7b1fa2; background: #f3e5f5; }
+    .stop-info { flex: 1; }
+    .stop-info .name { font-weight: 600; color: #263238; font-size: 0.95em; }
+    .stop-info .coords { font-size: 0.75em; color: #78909c; margin-top: 3px; font-family: monospace; }
+    .stop-info .badges { display: flex; gap: 6px; margin-top: 6px; flex-wrap: wrap; }
+    .badge { display: inline-block; font-size: 0.7em; padding: 2px 8px; border-radius: 10px; font-weight: 600; }
+    .badge-direction { background: #e1f5fe; color: #0277bd; }
+    .badge-both { background: #fff3e0; color: #e65100; }
+    .badge-outbound { background: #e3f2fd; color: #1565c0; }
+    .badge-return { background: #f3e5f5; color: #6a1b9a; }
+    .badge-start { background: #2e7d32; color: white; }
+    .badge-end { background: #c62828; color: white; }
+    .stop-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+    .stop-actions button { padding: 6px 10px; border: none; border-radius: 5px; cursor: pointer; font-size: 0.75em; font-weight: 600; }
+    .btn-edit { background: #fff3e0; color: #e65100; }
+    .btn-mark-start { background: #c8e6c9; color: #1b5e20; }
+    .btn-mark-end { background: #ffcdd2; color: #b71c1c; }
+    .btn-delete { background: #ffebee; color: #c62828; }
+    .admin-map-container { position: relative; }
+    .admin-map { height: 100%; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+    .map-legend { position: absolute; bottom: 20px; left: 20px; z-index: 1000; background: white; padding: 12px 16px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.15); font-size: 0.85em; }
+    .legend-item { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+    .legend-item:last-child { margin-bottom: 0; }
+    .legend-color { width: 16px; height: 16px; border-radius: 50%; }
+    .empty { text-align: center; color: #90a4ae; padding: 20px; font-style: italic; }
+
+    .conductor-screen { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: #000; }
+    .conductor-map { width: 100%; height: 100%; z-index: 1; }
+    .conductor-top-bar {
+      position: absolute; top: 0; left: 0; right: 0; z-index: 1000;
+      background: linear-gradient(135deg, rgba(26,35,126,0.95) 0%, rgba(40,53,147,0.95) 100%);
+      color: white; padding: 12px 16px;
+      display: flex; justify-content: space-between; align-items: center;
+      backdrop-filter: blur(10px);
+    }
+    .top-bar-left { display: flex; align-items: center; gap: 10px; }
+    .top-bar-left h1 { font-size: 1em; }
+    .vehicle-badge { background: rgba(255,255,255,0.2); padding: 3px 10px; border-radius: 10px; font-size: 0.75em; font-weight: 600; }
+    .top-bar-buttons { display: flex; gap: 6px; }
+    .top-bar-buttons button {
+      background: rgba(255,255,255,0.15); color: white; border: none;
+      padding: 6px 10px; border-radius: 6px; cursor: pointer;
+      font-size: 0.8em; font-weight: 600;
+    }
+    .top-bar-buttons button.muted { background: rgba(244,67,54,0.6); }
+    .gps-indicator {
+      position: absolute; top: 70px; left: 12px; z-index: 1000;
+      background: rgba(255,255,255,0.95); padding: 6px 12px;
+      border-radius: 15px; font-size: 0.75em; font-weight: 600;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.2); color: #f57c00;
+    }
+    .voice-announcement {
+      position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%) scale(0);
+      z-index: 1500; background: linear-gradient(135deg, #1976d2 0%, #0d47a1 100%);
+      color: white; padding: 30px 50px; border-radius: 20px;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.5); text-align: center;
+      transition: transform 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+      max-width: 90%;
+    }
+    .voice-announcement.show { transform: translate(-50%, -50%) scale(1); }
+    .voice-announcement .icon { font-size: 3em; margin-bottom: 10px; }
+    .voice-announcement .label { font-size: 0.9em; opacity: 0.9; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 1px; }
+    .voice-announcement .stop-name { font-size: 1.8em; font-weight: 700; text-shadow: 0 2px 4px rgba(0,0,0,0.3); }
+    .voice-announcement.speaking { animation: voicePulse 1.5s infinite; }
+    @keyframes voicePulse {
+      0%, 100% { box-shadow: 0 10px 40px rgba(25,118,210,0.5); }
+      50% { box-shadow: 0 10px 60px rgba(25,118,210,0.9), 0 0 0 20px rgba(25,118,210,0.2); }
+    }
+    .conductor-info-panel {
+      position: absolute; bottom: 0; left: 0; right: 0; z-index: 1000;
+      background: linear-gradient(to top, rgba(255,255,255,0.98) 80%, rgba(255,255,255,0.9) 100%);
+      padding: 16px 20px 20px 20px;
+      border-radius: 20px 20px 0 0;
+      box-shadow: 0 -4px 20px rgba(0,0,0,0.15);
+      backdrop-filter: blur(10px);
+    }
+    .info-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 12px; }
+    .info-box { background: #f5f7fa; padding: 10px; border-radius: 10px; text-align: center; }
+    .info-box .label { font-size: 0.65em; color: #78909c; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; font-weight: 600; }
+    .info-box .value { font-size: 1.1em; color: #263238; font-weight: 700; }
+    .next-stop-box {
+      background: linear-gradient(135deg, #1976d2 0%, #1565c0 100%);
+      color: white; padding: 12px; border-radius: 10px; text-align: center;
+    }
+    .next-stop-box .label { font-size: 0.7em; opacity: 0.9; margin-bottom: 4px; }
+    .next-stop-box .value { font-size: 1.1em; font-weight: 700; }
+    .audio-bar {
+      margin-top: 10px; padding: 10px; background: #e8f5e9;
+      color: #2e7d32; border-radius: 8px; text-align: center;
+      font-size: 0.85em; font-weight: 600; border: 1px solid #c8e6c9;
+    }
+    .audio-bar.speaking { background: #fff3e0; color: #e65100; border-color: #ffb74d; }
+
+    .modal { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); z-index: 2000; align-items: center; justify-content: center; padding: 20px; }
+    .modal.active { display: flex; }
+    .modal-content { background: white; border-radius: 16px; width: 100%; max-width: 700px; max-height: 85vh; overflow-y: auto; padding: 24px; }
+    .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 2px solid #e0e0e0; padding-bottom: 12px; }
+    .close-modal { background: none; border: none; font-size: 28px; cursor: pointer; color: #666; }
+    .trips-list { display: flex; flex-direction: column; gap: 10px; }
+    .trip-item { padding: 14px; background: #f5f7fa; border-radius: 10px; cursor: pointer; border-left: 4px solid #1976d2; }
+    .trip-item:hover { background: #e3f2fd; }
+    .trip-item .trip-date { font-weight: 600; color: #263238; }
+    .trip-item .trip-info { font-size: 0.85em; color: #78909c; margin-top: 4px; }
+    .trip-map { height: 400px; border-radius: 10px; margin-top: 12px; }
+    .btn-back-trips { background: #f5f7fa; border: none; padding: 8px 14px; border-radius: 6px; cursor: pointer; font-weight: 600; }
+
+    @media (max-width: 1024px) { .admin-container { grid-template-columns: 1fr; } .admin-map { height: 500px; } }
+    @media (max-width: 600px) {
+      .info-grid { grid-template-columns: 1fr 1fr 1fr; gap: 6px; }
+      .info-box .value { font-size: 0.95em; }
+      .voice-announcement .stop-name { font-size: 1.4em; }
+      .voice-announcement { padding: 20px 30px; }
+    }
+  </style>
+</head>
+<body>
+  <!-- LOGIN -->
+  <div id="loginScreen" class="auth-container">
+    <div class="auth-card">
+      <div class="auth-header">
+        <h1>🚌 Ruta Anta ↔ Cusco</h1>
+        <p>Sistema de Rastreo GPS con Voz Automática</p>
+      </div>
+      <div class="tabs">
+        <button class="tab active" data-tab="login">Iniciar Sesión</button>
+        <button class="tab" data-tab="register">Registrarse</button>
+      </div>
+      <form id="loginForm" class="auth-form active">
+        <div class="form-group">
+          <label>Usuario o Correo</label>
+          <input type="text" id="loginUser" required placeholder="admin o tu@correo.com" value="admin">
+        </div>
+        <div class="form-group">
+          <label>Contraseña</label>
+          <input type="password" id="loginPassword" required placeholder="••••••••" value="admin">
+        </div>
+        <button type="submit" class="btn-primary">Entrar</button>
+        <div id="loginError" class="error-msg"></div>
+      </form>
+      <form id="registerForm" class="auth-form">
+        <div class="form-group">
+          <label>Correo electrónico</label>
+          <input type="email" id="regEmail" required placeholder="tu@correo.com">
+        </div>
+        <div class="form-group">
+          <label>Contraseña</label>
+          <input type="password" id="regPassword" required minlength="6" placeholder="Mínimo 6 caracteres">
+        </div>
+        <div class="form-group">
+          <label>Código del Vehículo</label>
+          <input type="text" id="regVehicle" required placeholder="Ej: BUS-001" style="text-transform: uppercase;">
+        </div>
+        <button type="submit" class="btn-primary">Registrarme</button>
+        <div id="registerMsg" class="msg"></div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ADMIN -->
+  <div id="adminScreen" style="display:none;">
+    <header class="admin-header">
+      <h1>🛣️ Gestión de Ruta Anta ↔ Cusco</h1>
+      <div class="header-actions">
+        <span class="user-info" id="adminUserInfo">--</span>
+        <button class="btn-logout" onclick="logout()">Salir</button>
+      </div>
+    </header>
+    <div class="admin-container">
+      <section class="admin-sidebar">
+        <div class="card instructions">
+          <h2>📋 Ruta Configurada</h2>
+          <p style="color:#1565c0;font-size:0.9em;line-height:1.6;">
+            <strong>IDA (Anta→Cusco):</strong> Terminal Anta → Huachancay → Pucyura → Cachimayo → Poroy → Arco → Posta → San Benito → Villa María → Mirador → San Isidro → Independencia → Almundena → Terminal Huayruropata<br><br>
+            <strong>VUELTA (Cusco→Anta):</strong> Terminal Huayruropata → Poroy → Cachimayo → Pucyura → Huachancay → Carmen → La Unión → Feria → Control → Terminal Anta
+          </p>
+        </div>
+        <div class="card">
+          <h2>➕ Nuevo / Editar Paradero</h2>
+          <form id="stopForm">
+            <div class="form-group">
+              <label>Nombre (se anunciará por voz)</label>
+              <input type="text" id="stopName" required>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label>Latitud</label>
+                <input type="number" step="any" id="stopLat" required readonly>
+              </div>
+              <div class="form-group">
+                <label>Longitud</label>
+                <input type="number" step="any" id="stopLng" required readonly>
+              </div>
+            </div>
+            <div class="form-group">
+              <label>Radio de Geocerca (km)</label>
+              <input type="number" step="0.1" id="stopRadius" value="0.3" required>
+            </div>
+            <div class="form-group">
+              <label>Dirección del Paradero</label>
+              <select id="stopDirection" required>
+                <option value="both">🔄 Ambos sentidos (ida y vuelta)</option>
+                <option value="outbound">➡️ Solo ida (Anta → Cusco)</option>
+                <option value="return">⬅️ Solo vuelta (Cusco → Anta)</option>
+              </select>
+            </div>
+            <div class="form-actions">
+              <button type="button" id="btnCancel" class="btn-secondary" style="display:none;">Cancelar</button>
+              <button type="submit" class="btn-primary">Guardar</button>
+            </div>
+          </form>
+        </div>
+        <div class="card">
+          <h2>📋 Paraderos (<span id="stopCount">0</span>)</h2>
+          <div id="stopsList" class="stops-list"></div>
+        </div>
+      </section>
+      <section class="admin-map-container">
+        <div id="adminMap" class="admin-map"></div>
+        <div class="map-legend">
+          <div class="legend-item"><span class="legend-color" style="background:#2e7d32;"></span> Terminal</div>
+          <div class="legend-item"><span class="legend-color" style="background:#1976d2;"></span> Solo Ida</div>
+          <div class="legend-item"><span class="legend-color" style="background:#7b1fa2;"></span> Solo Vuelta</div>
+          <div class="legend-item"><span class="legend-color" style="background:#ff9800;"></span> Ambos sentidos</div>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <!-- CONDUCTOR -->
+  <div id="conductorScreen" class="conductor-screen" style="display:none;">
+    <div class="conductor-top-bar">
+      <div class="top-bar-left">
+        <h1>🚌</h1>
+        <span class="vehicle-badge" id="vehicleBadge">--</span>
+      </div>
+      <div class="top-bar-buttons">
+        <button id="btnMute" onclick="toggleMute()" title="Silenciar/Activar voz">🔊</button>
+        <button onclick="syncRoute()" title="Sincronizar ruta">🔄</button>
+        <button onclick="openHistory()" title="Historial">📊</button>
+        <button onclick="logout()" title="Salir">🚪</button>
+      </div>
+    </div>
+    <div id="gpsIndicator" class="gps-indicator">📡 Buscando GPS...</div>
+    <div id="voiceAnnouncement" class="voice-announcement">
+      <div class="icon">🔊</div>
+      <div class="label">Anunciando paradero</div>
+      <div class="stop-name" id="announcementText">--</div>
+    </div>
+    <div id="conductorMap" class="conductor-map"></div>
+    <div class="conductor-info-panel">
+      <div class="info-grid">
+        <div class="info-box">
+          <div class="label">Velocidad</div>
+          <div class="value" id="infoSpeed">0 km/h</div>
+        </div>
+        <div class="info-box">
+          <div class="label">Tiempo</div>
+          <div class="value" id="infoTime">00:00:00</div>
+        </div>
+        <div class="info-box">
+          <div class="label">Dirección</div>
+          <div class="value" id="infoDirection">--</div>
+        </div>
+      </div>
+      <div class="next-stop-box">
+        <div class="label">📍 Próximo Paradero</div>
+        <div class="value" id="infoNextStop">--</div>
+      </div>
+      <div class="audio-bar" id="audioBar">🔊 Voz automática activada</div>
+    </div>
+  </div>
+
+  <!-- MODAL HISTORIAL -->
+  <div id="historyModal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>📊 Mis Viajes</h2>
+        <button class="close-modal" onclick="closeHistory()">×</button>
+      </div>
+      <div id="tripsList" class="trips-list"><p class="empty">Cargando...</p></div>
+      <div id="tripDetail" style="display:none;">
+        <button class="btn-back-trips" onclick="backToTrips()">← Volver</button>
+        <div id="tripMap" class="trip-map"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ===== BASE DE DATOS LOCAL =====
+    const DB = {
+      getUsers: () => JSON.parse(localStorage.getItem('users') || '[]'),
+      saveUsers: (u) => localStorage.setItem('users', JSON.stringify(u)),
+      getStops: () => JSON.parse(localStorage.getItem('route_stops') || '[]'),
+      saveStops: (s) => localStorage.setItem('route_stops', JSON.stringify(s)),
+      getLogs: () => JSON.parse(localStorage.getItem('route_logs') || '[]'),
+      saveLogs: (l) => localStorage.setItem('route_logs', JSON.stringify(l)),
+      getCurrentUser: () => JSON.parse(localStorage.getItem('currentUser') || 'null'),
+      setCurrentUser: (u) => localStorage.setItem('currentUser', JSON.stringify(u)),
+      clearCurrentUser: () => localStorage.removeItem('currentUser')
+    };
+
+    // ===== 🗺️ RUTA REAL ANTA ↔ CUSCO =====
+    if (DB.getUsers().length === 0) {
+      DB.saveUsers([{ id: 1, username: 'admin', email: 'admin@transporte.com', password: 'admin', role: 'admin', status: 'approved', vehicle_code: null }]);
+    }
+    
+    if (DB.getStops().length === 0) {
+      // Coordenadas aproximadas de la ruta real Anta - Cusco
+      // Puedes ajustarlas desde el panel admin haciendo clic en el mapa
+      DB.saveStops([
+        // ===== TERMINAL DE SALIDA =====
+        { id: 1, name: "Terminal Terrestre de Anta", lat: -13.4225, lng: -72.1855, radius_km: 0.4, direction: "both", type: "start", order_index: 1 },
+        
+        // ===== PARADEROS COMPARTIDOS (ambos sentidos) =====
+        { id: 2, name: "Huachancay", lat: -13.4480, lng: -72.1320, radius_km: 0.3, direction: "both", type: "intermediate", order_index: 2 },
+        { id: 3, name: "Pucyura", lat: -13.4680, lng: -72.0950, radius_km: 0.3, direction: "both", type: "intermediate", order_index: 3 },
+        { id: 4, name: "Cachimayo", lat: -13.4850, lng: -72.0600, radius_km: 0.3, direction: "both", type: "intermediate", order_index: 4 },
+        { id: 5, name: "Poroy", lat: -13.4980, lng: -72.0280, radius_km: 0.3, direction: "both", type: "intermediate", order_index: 5 },
+        
+        // ===== PARADEROS SOLO IDA (Anta → Cusco) =====
+        { id: 6, name: "Arco", lat: -13.5050, lng: -72.0080, radius_km: 0.3, direction: "outbound", type: "intermediate", order_index: 6 },
+        { id: 7, name: "Posta", lat: -13.5100, lng: -71.9950, radius_km: 0.3, direction: "outbound", type: "intermediate", order_index: 7 },
+        { id: 8, name: "San Benito", lat: -13.5150, lng: -71.9820, radius_km: 0.3, direction: "outbound", type: "intermediate", order_index: 8 },
+        { id: 9, name: "Villa María", lat: -13.5190, lng: -71.9720, radius_km: 0.3, direction: "outbound", type: "intermediate", order_index: 9 },
+        { id: 10, name: "Mirador", lat: -13.5230, lng: -71.9650, radius_km: 0.3, direction: "outbound", type: "intermediate", order_index: 10 },
+        { id: 11, name: "San Isidro", lat: -13.5265, lng: -71.9600, radius_km: 0.3, direction: "outbound", type: "intermediate", order_index: 11 },
+        { id: 12, name: "Independencia", lat: -13.5295, lng: -71.9575, radius_km: 0.3, direction: "outbound", type: "intermediate", order_index: 12 },
+        { id: 13, name: "Almudena", lat: -13.5325, lng: -71.9565, radius_km: 0.3, direction: "outbound", type: "intermediate", order_index: 13 },
+        
+        // ===== TERMINAL DE LLEGADA =====
+        { id: 14, name: "Terminal Huayruropata", lat: -13.5355, lng: -71.9555, radius_km: 0.4, direction: "both", type: "end", order_index: 14 },
+        
+        // ===== PARADEROS SOLO VUELTA (Cusco → Anta) =====
+        { id: 15, name: "Carmen", lat: -13.5200, lng: -71.9750, radius_km: 0.3, direction: "return", type: "intermediate", order_index: 15 },
+        { id: 16, name: "La Unión", lat: -13.5050, lng: -72.0100, radius_km: 0.3, direction: "return", type: "intermediate", order_index: 16 },
+        { id: 17, name: "Feria", lat: -13.4850, lng: -72.0550, radius_km: 0.3, direction: "return", type: "intermediate", order_index: 17 },
+        { id: 18, name: "Control", lat: -13.4650, lng: -72.1000, radius_km: 0.3, direction: "return", type: "intermediate", order_index: 18 }
+      ]);
+    }
+
+    function getDistanceKm(lat1, lon1, lat2, lon2) {
+      const R = 6371;
+      const dLat = (lat2 - lat1) * Math.PI / 180;
+      const dLon = (lon2 - lon1) * Math.PI / 180;
+      const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180) * Math.cos(lat2*Math.PI/180) * Math.sin(dLon/2)**2;
+      return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    }
+
+    function logout() {
+      if (wakeLock) wakeLock.release();
+      DB.clearCurrentUser();
+      location.reload();
+    }
+
+    // ===== 🎙️ SISTEMA DE VOZ AUTOMÁTICA =====
+    const VoiceSystem = {
+      isMuted: false,
+      voices: [],
+      selectedVoice: null,
+      isReady: false,
+      queue: [],
+      isSpeaking: false,
+
+      init() {
+        const loadVoices = () => {
+          this.voices = window.speechSynthesis.getVoices();
+          this.selectBestVoice();
+          this.isReady = true;
+        };
+        loadVoices();
+        if (speechSynthesis.onvoiceschanged !== undefined) {
+          speechSynthesis.onvoiceschanged = loadVoices;
+        }
+        this.unlockAudio();
+      },
+
+      unlockAudio() {
+        const unlock = () => {
+          if (!('speechSynthesis' in window)) return;
+          const silent = new SpeechSynthesisUtterance(' ');
+          silent.volume = 0.01;
+          silent.lang = 'es-PE';
+          window.speechSynthesis.speak(silent);
+          document.removeEventListener('touchstart', unlock);
+          document.removeEventListener('touchend', unlock);
+          document.removeEventListener('click', unlock);
+        };
+        document.addEventListener('touchstart', unlock, { once: true });
+        document.addEventListener('touchend', unlock, { once: true });
+        document.addEventListener('click', unlock, { once: true });
+      },
+
+      selectBestVoice() {
+        const priorities = [
+          v => v.lang === 'es-PE', v => v.lang === 'es-MX', v => v.lang === 'es-AR',
+          v => v.lang === 'es-CL', v => v.lang === 'es-CO',
+          v => v.lang.startsWith('es-419'), v => v.lang.startsWith('es'), v => true
+        ];
+        for (const p of priorities) {
+          const v = this.voices.find(p);
+          if (v) { this.selectedVoice = v; return; }
+        }
+      },
+
+      playDing() {
+        try {
+          const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+          const oscillator = audioCtx.createOscillator();
+          const gainNode = audioCtx.createGain();
+          oscillator.connect(gainNode);
+          gainNode.connect(audioCtx.destination);
+          oscillator.frequency.value = 880;
+          oscillator.type = 'sine';
+          gainNode.gain.setValueAtTime(0.3, audioCtx.currentTime);
+          gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.5);
+          oscillator.start(audioCtx.currentTime);
+          oscillator.stop(audioCtx.currentTime + 0.5);
+        } catch (e) {}
+      },
+
+      speak(text, priority = 'normal') {
+        if (this.isMuted) {
+          this.updateBar(`🔇 Silenciado: "${text}"`);
+          return;
+        }
+        if (!('speechSynthesis' in window)) return;
+
+        const doSpeak = () => {
+          if (priority === 'high') {
+            window.speechSynthesis.cancel();
+            this.queue = [];
+          }
+          const utterance = new SpeechSynthesisUtterance(text);
+          utterance.lang = 'es-PE';
+          utterance.rate = 0.9;
+          utterance.pitch = 1.0;
+          utterance.volume = 1.0;
+          if (this.selectedVoice) utterance.voice = this.selectedVoice;
+
+          utterance.onstart = () => {
+            this.isSpeaking = true;
+            document.getElementById('audioBar').classList.add('speaking');
+          };
+          utterance.onend = () => {
+            this.isSpeaking = false;
+            document.getElementById('audioBar').classList.remove('speaking');
+            this.processQueue();
+          };
+          utterance.onerror = () => {
+            this.isSpeaking = false;
+            this.processQueue();
+          };
+
+          if (this.isSpeaking || window.speechSynthesis.speaking) {
+            this.queue.push(utterance);
+          } else {
+            window.speechSynthesis.speak(utterance);
+          }
+        };
+
+        if (this.isReady) doSpeak();
+        else setTimeout(doSpeak, 500);
+      },
+
+      processQueue() {
+        if (this.queue.length > 0) {
+          window.speechSynthesis.speak(this.queue.shift());
+        } else {
+          setTimeout(() => {
+            if (!this.isSpeaking) this.updateBar('🔊 Voz automática activada');
+          }, 1000);
+        }
+      },
+
+      updateBar(text) {
+        const bar = document.getElementById('audioBar');
+        if (bar) bar.textContent = text;
+      },
+
+      announceStop(stopName, stopType, direction) {
+        let message;
+        if (stopType === 'start') {
+          message = direction === 'return' 
+            ? `Inicio de regreso desde ${stopName}. Buen viaje.`
+            : `Inicio de recorrido en ${stopName}. Buen viaje.`;
+        } else if (stopType === 'end') {
+          message = direction === 'outbound'
+            ? `Final del recorrido en ${stopName}. Gracias por su preferencia.`
+            : `Llegada a ${stopName}. Fin del recorrido. Gracias por su preferencia.`;
+        } else {
+          message = `Paradero: ${stopName}.`;
+        }
+        
+        this.playDing();
+        if ('vibrate' in navigator) navigator.vibrate([200, 100, 200]);
+        showAnnouncement(stopName, stopType, direction);
+        setTimeout(() => this.speak(message, 'high'), 300);
+      },
+
+      welcome() {
+        setTimeout(() => {
+          this.speak('Sistema GPS activado. Ruta Anta Cusco. Iniciando recorrido.', 'high');
+          this.updateBar('🔊 Voz automática activada');
+        }, 1000);
+      },
+
+      toggleMute() {
+        this.isMuted = !this.isMuted;
+        const btn = document.getElementById('btnMute');
+        if (this.isMuted) {
+          btn.classList.add('muted');
+          btn.textContent = '🔇';
+          window.speechSynthesis.cancel();
+          this.updateBar('🔇 Voz silenciada');
+          hideAnnouncement();
+        } else {
+          btn.classList.remove('muted');
+          btn.textContent = '🔊';
+          this.updateBar('🔊 Voz automática activada');
+          this.speak('Voz activada.', 'high');
+        }
+      }
+    };
+
+    function showAnnouncement(stopName, stopType, direction) {
+      const panel = document.getElementById('voiceAnnouncement');
+      const text = document.getElementById('announcementText');
+      const icon = panel.querySelector('.icon');
+      const label = panel.querySelector('.label');
+      
+      if (stopType === 'start') {
+        icon.textContent = direction === 'return' ? '⬅️' : '🟢';
+        label.textContent = direction === 'return' ? 'Inicio de Regreso' : 'Inicio de Recorrido';
+      } else if (stopType === 'end') {
+        icon.textContent = direction === 'outbound' ? '🔴' : '🏁';
+        label.textContent = 'Final del Recorrido';
+      } else {
+        icon.textContent = '📍';
+        label.textContent = 'Paradero';
+      }
+      
+      text.textContent = stopName;
+      panel.classList.add('show', 'speaking');
+      setTimeout(hideAnnouncement, 5000);
+    }
+
+    function hideAnnouncement() {
+      const panel = document.getElementById('voiceAnnouncement');
+      panel.classList.remove('show', 'speaking');
+    }
+
+    function toggleMute() { VoiceSystem.toggleMute(); }
+
+    let wakeLock = null;
+    async function requestWakeLock() {
+      if ('wakeLock' in navigator) {
+        try {
+          wakeLock = await navigator.wakeLock.request('screen');
+        } catch (err) {}
+      }
+    }
+
+    // ===== LOGIN =====
+    document.querySelectorAll('.tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.auth-form').forEach(f => f.classList.remove('active'));
+        tab.classList.add('active');
+        document.getElementById(`${tab.dataset.tab}Form`).classList.add('active');
+      });
+    });
+
+    document.getElementById('loginForm').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const errorEl = document.getElementById('loginError');
+      errorEl.textContent = '';
+      const login = document.getElementById('loginUser').value.trim();
+      const password = document.getElementById('loginPassword').value;
+      const user = DB.getUsers().find(u => (u.username === login || u.email === login) && u.password === password);
+      if (!user) { errorEl.textContent = 'Credenciales inválidas'; errorEl.style.color = '#c62828'; return; }
+      if (user.status === 'pending') { errorEl.textContent = 'Cuenta pendiente de aprobación'; errorEl.style.color = '#c62828'; return; }
+      DB.setCurrentUser(user);
+      loadApp();
+    });
+
+    document.getElementById('registerForm').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const msgEl = document.getElementById('registerMsg');
+      const email = document.getElementById('regEmail').value;
+      const password = document.getElementById('regPassword').value;
+      const vehicle_code = document.getElementById('regVehicle').value.toUpperCase();
+      if (DB.getUsers().find(u => u.email === email)) {
+        msgEl.textContent = 'Este correo ya está registrado'; msgEl.style.color = '#c62828'; return;
+      }
+      const users = DB.getUsers();
+      users.push({ id: Date.now(), email, password, vehicle_code, role: 'conductor', status: 'pending' });
+      DB.saveUsers(users);
+      msgEl.textContent = '✅ Registro exitoso. Espera aprobación del administrador.';
+      msgEl.style.color = '#2e7d32';
+      e.target.reset();
+      setTimeout(() => document.querySelector('.tab[data-tab="login"]').click(), 2000);
+    });
+
+    function loadApp() {
+      const user = DB.getCurrentUser();
+      if (!user) return;
+      if (user.role === 'admin') {
+        document.getElementById('loginScreen').style.display = 'none';
+        document.getElementById('adminScreen').style.display = 'block';
+        initAdmin();
+      } else {
+        document.getElementById('loginScreen').style.display = 'none';
+        document.getElementById('conductorScreen').style.display = 'block';
+        document.getElementById('vehicleBadge').textContent = user.vehicle_code;
+        initConductor();
+      }
+    }
+
+    // ===== ADMIN =====
+    let adminMap, tempMarker, currentStops = [], editingStopId = null;
+
+    function initAdmin() {
+      document.getElementById('adminUserInfo').textContent = `👤 ${DB.getCurrentUser().username}`;
+      adminMap = L.map('adminMap').setView([-13.4800, -72.0700], 12);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap' }).addTo(adminMap);
+      
+      adminMap.on('click', (e) => {
+        document.getElementById('stopLat').value = e.latlng.lat.toFixed(6);
+        document.getElementById('stopLng').value = e.latlng.lng.toFixed(6);
+        if (tempMarker) adminMap.removeLayer(tempMarker);
+        tempMarker = L.marker(e.latlng, {
+          icon: L.divIcon({ html: '<div style="background:#ff9800;width:24px;height:24px;border-radius:50%;border:3px solid white;box-shadow:0 2px 8px rgba(0,0,0,0.3);"></div>', iconSize: [24, 24] })
+        }).addTo(adminMap);
+        document.getElementById('stopName').focus();
+      });
+      
+      document.getElementById('stopForm').addEventListener('submit', (e) => {
+        e.preventDefault();
+        const stopData = {
+          name: document.getElementById('stopName').value.trim(),
+          lat: parseFloat(document.getElementById('stopLat').value),
+          lng: parseFloat(document.getElementById('stopLng').value),
+          radius_km: parseFloat(document.getElementById('stopRadius').value),
+          direction: document.getElementById('stopDirection').value
+        };
+        const stops = DB.getStops();
+        if (editingStopId) {
+          const idx = stops.findIndex(s => s.id === editingStopId);
+          if (idx !== -1) stops[idx] = { ...stops[idx], ...stopData };
+          editingStopId = null;
+          document.getElementById('btnCancel').style.display = 'none';
+        } else {
+          stopData.id = Date.now();
+          stopData.type = 'intermediate';
+          stopData.order_index = stops.length + 1;
+          stops.push(stopData);
+        }
+        DB.saveStops(stops);
+        renderStops(stops);
+        e.target.reset();
+        document.getElementById('stopRadius').value = '0.3';
+        document.getElementById('stopDirection').value = 'both';
+        if (tempMarker) { adminMap.removeLayer(tempMarker); tempMarker = null; }
+      });
+      
+      document.getElementById('btnCancel').addEventListener('click', () => {
+        editingStopId = null;
+        document.getElementById('stopForm').reset();
+        document.getElementById('btnCancel').style.display = 'none';
+        if (tempMarker) { adminMap.removeLayer(tempMarker); tempMarker = null; }
+      });
+      renderStops(DB.getStops());
+    }
+
+    function renderStops(stops) {
+      currentStops = stops;
+      document.getElementById('stopCount').textContent = stops.length;
+      const list = document.getElementById('stopsList');
+      if (stops.length === 0) {
+        list.innerHTML = '<p class="empty">Haz clic en el mapa para agregar paraderos</p>';
+        renderAdminMapMarkers(stops);
+        return;
+      }
+      list.innerHTML = stops.map((stop, index) => {
+        let className = 'stop-item', badges = '';
+        if (stop.type === 'start') { className += ' terminal-start'; badges += '<span class="badge badge-start">🟢 TERMINAL</span>'; }
+        else if (stop.type === 'end') { className += ' terminal-end'; badges += '<span class="badge badge-end">🔴 TERMINAL</span>'; }
+        
+        if (stop.direction === 'outbound') {
+          className += ' direction-outbound';
+          badges += '<span class="badge badge-outbound">➡️ Solo Ida</span>';
+        } else if (stop.direction === 'return') {
+          className += ' direction-return';
+          badges += '<span class="badge badge-return">⬅️ Solo Vuelta</span>';
+        } else {
+          badges += '<span class="badge badge-both">🔄 Ambos</span>';
+        }
+        
+        return `
+          <div class="${className}" data-id="${stop.id}">
+            <div class="stop-info">
+              <div class="name">${index + 1}. ${stop.name}</div>
+              <div class="coords">📍 ${stop.lat.toFixed(5)}, ${stop.lng.toFixed(5)} | Radio: ${stop.radius_km} km</div>
+              <div class="badges">${badges}</div>
+            </div>
+            <div class="stop-actions">
+              <button class="btn-edit" onclick="editStop(${stop.id})">✏️</button>
+              <button class="btn-mark-start" onclick="markTerminal(${stop.id}, 'start')">🟢</button>
+              <button class="btn-mark-end" onclick="markTerminal(${stop.id}, 'end')">🔴</button>
+              <button class="btn-delete" onclick="deleteStop(${stop.id})">🗑️</button>
+            </div>
+          </div>`;
+      }).join('');
+      
+      new Sortable(list, {
+        animation: 150,
+        onEnd: () => {
+          const newOrder = Array.from(list.querySelectorAll('.stop-item')).map(el => parseInt(el.dataset.id));
+          const stops = DB.getStops();
+          newOrder.forEach((id, index) => { const stop = stops.find(s => s.id === id); if (stop) stop.order_index = index + 1; });
+          DB.saveStops(stops);
+          renderStops(stops);
+        }
+      });
+      renderAdminMapMarkers(stops);
+    }
+
+    const adminMarkersLayer = L.layerGroup();
+    function renderAdminMapMarkers(stops) {
+      adminMarkersLayer.clearLayers();
+      adminMarkersLayer.addTo(adminMap);
+      
+      // Dibujar ruta de ida (azul)
+      const outboundStops = stops.filter(s => s.direction === 'outbound' || s.direction === 'both');
+      if (outboundStops.length > 1) {
+        L.polyline(outboundStops.map(s => [s.lat, s.lng]), { 
+          color: '#1976d2', weight: 4, opacity: 0.7, dashArray: '10, 10' 
+        }).addTo(adminMarkersLayer).bindPopup('➡️ Ruta Ida');
+      }
+      
+      // Dibujar ruta de vuelta (púrpura)
+      const returnStops = stops.filter(s => s.direction === 'return' || s.direction === 'both');
+      if (returnStops.length > 1) {
+        L.polyline(returnStops.map(s => [s.lat, s.lng]), { 
+          color: '#7b1fa2', weight: 4, opacity: 0.7, dashArray: '5, 10' 
+        }).addTo(adminMarkersLayer).bindPopup('⬅️ Ruta Vuelta');
+      }
+      
+      stops.forEach((stop, index) => {
+        let color = '#ff9800', label = `${index + 1}`;
+        if (stop.type === 'start') { color = '#2e7d32'; label = '🟢'; }
+        else if (stop.type === 'end') { color = '#c62828'; label = '🔴'; }
+        else if (stop.direction === 'outbound') { color = '#1976d2'; }
+        else if (stop.direction === 'return') { color = '#7b1fa2'; }
+        
+        L.circle([stop.lat, stop.lng], { 
+          radius: stop.radius_km * 1000, color, fillOpacity: 0.1, weight: 2 
+        }).addTo(adminMarkersLayer);
+        
+        L.marker([stop.lat, stop.lng], {
+          icon: L.divIcon({ 
+            html: `<div style="background:${color};color:white;width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:bold;font-size:14px;border:3px solid white;box-shadow:0 2px 8px rgba(0,0,0,0.3);">${label}</div>`, 
+            iconSize: [32, 32], iconAnchor: [16, 16] 
+          })
+        }).addTo(adminMarkersLayer).bindPopup(`<b>${stop.name}</b><br><small>${stop.direction === 'outbound' ? '➡️ Solo Ida' : stop.direction === 'return' ? '⬅️ Solo Vuelta' : '🔄 Ambos'}</small>`);
+      });
+    }
+
+    window.editStop = (stopId) => {
+      const stop = currentStops.find(s => s.id === stopId);
+      if (!stop) return;
+      editingStopId = stopId;
+      document.getElementById('stopName').value = stop.name;
+      document.getElementById('stopLat').value = stop.lat;
+      document.getElementById('stopLng').value = stop.lng;
+      document.getElementById('stopRadius').value = stop.radius_km;
+      document.getElementById('stopDirection').value = stop.direction;
+      document.getElementById('btnCancel').style.display = 'block';
+      adminMap.setView([stop.lat, stop.lng], 15);
+    };
+
+    window.markTerminal = (stopId, type) => {
+      const stops = DB.getStops();
+      stops.forEach(s => { if (s.type === type) s.type = 'intermediate'; });
+      const target = stops.find(s => s.id === stopId);
+      if (target) target.type = type;
+      DB.saveStops(stops);
+      renderStops(stops);
+    };
+
+    window.deleteStop = (stopId) => {
+      if (!confirm('¿Eliminar este paradero?')) return;
+      DB.saveStops(DB.getStops().filter(s => s.id !== stopId));
+      renderStops(DB.getStops());
+    };
+
+    // ===== CONDUCTOR =====
+    let conductorMap, routeStops = [], currentDirection = 'outbound', startTime = Date.now();
+    let lastStopId = null, lastVisitedOrderIndex = -1;
+    let vehicleMarker = null;
+    let conductorStopsLayer = L.layerGroup();
+
+    function initConductor() {
+      conductorMap = L.map('conductorMap', {
+        zoomControl: false, attributionControl: false
+      }).setView([-13.4800, -72.0700], 12);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(conductorMap);
+      conductorStopsLayer.addTo(conductorMap);
+      
+      routeStops = DB.getStops();
+      renderConductorRoute();
+      VoiceSystem.init();
+      VoiceSystem.welcome();
+      requestWakeLock();
+      startGPS();
+      setInterval(updateTime, 1000);
+    }
+
+    function renderConductorRoute() {
+      conductorStopsLayer.clearLayers();
+      
+      // Mostrar paraderos según la dirección actual
+      const visibleStops = routeStops.filter(s => 
+        s.direction === 'both' || s.direction === currentDirection
+      );
+      
+      // Dibujar línea de la ruta visible
+      if (visibleStops.length > 1) {
+        const color = currentDirection === 'outbound' ? '#1976d2' : '#7b1fa2';
+        L.polyline(visibleStops.map(s => [s.lat, s.lng]), { 
+          color: color, weight: 5, opacity: 0.7 
+        }).addTo(conductorStopsLayer);
+      }
+      
+      visibleStops.forEach((stop, index) => {
+        let color = '#ff9800', label = `${index + 1}`;
+        if (stop.type === 'start') { color = '#2e7d32'; label = '🟢'; }
+        if (stop.type === 'end') { color = '#c62828'; label = '🔴'; }
+        
+        L.circle([stop.lat, stop.lng], { 
+          radius: stop.radius_km * 1000, color, fillOpacity: 0.15, weight: 2 
+        }).addTo(conductorStopsLayer);
+        
+        L.marker([stop.lat, stop.lng], {
+          icon: L.divIcon({ 
+            html: `<div style="background:${color};color:white;width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:bold;font-size:14px;border:3px solid white;box-shadow:0 2px 8px rgba(0,0,0,0.3);">${label}</div>`, 
+            iconSize: [32, 32], iconAnchor: [16, 16] 
+          })
+        }).addTo(conductorStopsLayer).bindPopup(`<b>${stop.name}</b>`);
+      });
+    }
+
+    function syncRoute() {
+      routeStops = DB.getStops();
+      renderConductorRoute();
+      VoiceSystem.speak('Ruta sincronizada correctamente.', 'high');
+    }
+
+    function startGPS() {
+      const gpsEl = document.getElementById('gpsIndicator');
+      if ("geolocation" in navigator) {
+        navigator.geolocation.watchPosition(
+          (position) => {
+            gpsEl.innerText = '🟢 GPS Activo';
+            gpsEl.style.color = '#2e7d32';
+            const lat = position.coords.latitude;
+            const lng = position.coords.longitude;
+            const speedMs = position.coords.speed;
+            const speedKmh = speedMs !== null ? Math.round(speedMs * 3.6) : 0;
+            updateVehiclePosition(lat, lng, speedKmh);
+          },
+          (error) => {
+            gpsEl.innerText = '🔴 Error GPS';
+            gpsEl.style.color = '#c62828';
+          },
+          { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+        );
+      } else {
+        gpsEl.innerText = '🔴 Sin GPS';
+      }
+    }
+
+    function updateVehiclePosition(lat, lng, speed) {
+      document.getElementById('infoSpeed').textContent = `${speed} km/h`;
+      
+      if (!vehicleMarker) {
+        vehicleMarker = L.marker([lat, lng], {
+          icon: L.divIcon({ 
+            html: '<div style="background:#1976d2;color:white;width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:20px;border:3px solid white;box-shadow:0 2px 10px rgba(0,0,0,0.4);">🚌</div>', 
+            iconSize: [36, 36], iconAnchor: [18, 18] 
+          })
+        }).addTo(conductorMap);
+        conductorMap.setView([lat, lng], 14);
+      } else {
+        vehicleMarker.setLatLng([lat, lng]);
+      }
+      
+      // 🎯 GEOFENCING - Detectar paraderos según dirección actual
+      routeStops.forEach((stop, index) => {
+        // Solo verificar paraderos válidos para la dirección actual
+        if (stop.direction !== 'both' && stop.direction !== currentDirection) return;
+        
+        const distance = getDistanceKm(lat, lng, stop.lat, stop.lng);
+        
+        if (distance <= stop.radius_km && lastStopId !== stop.id) {
+          lastStopId = stop.id;
+          
+          // Detectar dirección basada en el orden
+          if (lastVisitedOrderIndex !== -1) {
+            if (index > lastVisitedOrderIndex) currentDirection = 'outbound';
+            else if (index < lastVisitedOrderIndex) currentDirection = 'return';
+          }
+          lastVisitedOrderIndex = index;
+          
+          document.getElementById('infoDirection').textContent = 
+            currentDirection === 'outbound' ? '➡️ Ida' : '⬅️ Vuelta';
+          
+          // 🎙️ ANUNCIO AUTOMÁTICO
+          VoiceSystem.announceStop(stop.name, stop.type, currentDirection);
+          
+          // Actualizar mapa si cambió la dirección
+          renderConductorRoute();
+          
+          saveToHistory(lat, lng, speed, stop.name);
+        }
+      });
+      
+      if (!window.lastLogTime || Date.now() - window.lastLogTime > 30000) {
+        saveToHistory(lat, lng, speed, null);
+        window.lastLogTime = Date.now();
+      }
+      
+      const nextStop = getNextStop(lat, lng);
+      document.getElementById('infoNextStop').textContent = nextStop ? nextStop.name : 'Fin de la ruta';
+    }
+
+    function saveToHistory(lat, lng, speed, stopName) {
+      const logs = DB.getLogs();
+      const user = DB.getCurrentUser();
+      logs.push({ 
+        id: Date.now() + Math.random(), 
+        user_id: user.id, vehicle_code: user.vehicle_code, 
+        trip_id: `TRIP-${Date.now()}`, 
+        lat, lng, speed, stop_name: stopName, 
+        direction: currentDirection, 
+        recorded_at: new Date().toISOString() 
+      });
+      DB.saveLogs(logs);
+    }
+
+    function getNextStop(lat, lng) {
+      if (!lat || !lng || routeStops.length === 0) return null;
+      const visibleStops = routeStops.filter(s => 
+        s.direction === 'both' || s.direction === currentDirection
+      );
+      let closest = null, minDist = Infinity;
+      visibleStops.forEach(stop => { 
+        const d = getDistanceKm(lat, lng, stop.lat, stop.lng); 
+        if (d < minDist) { minDist = d; closest = stop; } 
+      });
+      const idx = visibleStops.findIndex(s => s.id === closest.id);
+      return visibleStops[Math.min(idx + 1, visibleStops.length - 1)];
+    }
+
+    function updateTime() {
+      const elapsed = Math.floor((Date.now() - startTime) / 1000);
+      const hrs = String(Math.floor(elapsed / 3600)).padStart(2, '0');
+      const mins = String(Math.floor((elapsed % 3600) / 60)).padStart(2, '0');
+      const secs = String(elapsed % 60).padStart(2, '0');
+      document.getElementById('infoTime').textContent = `${hrs}:${mins}:${secs}`;
+    }
+
+    // ===== HISTORIAL =====
+    let tripMap = null;
+    window.openHistory = () => {
+      document.getElementById('historyModal').classList.add('active');
+      document.getElementById('tripDetail').style.display = 'none';
+      document.getElementById('tripsList').style.display = 'block';
+      const user = DB.getCurrentUser();
+      const logs = DB.getLogs().filter(l => l.user_id === user.id);
+      const trips = {};
+      logs.forEach(log => {
+        if (!trips[log.trip_id]) trips[log.trip_id] = { trip_id: log.trip_id, points: [], max_speed: 0 };
+        trips[log.trip_id].points.push(log);
+        if (log.speed > trips[log.trip_id].max_speed) trips[log.trip_id].max_speed = log.speed;
+      });
+      const tripsArray = Object.values(trips).sort((a, b) => new Date(b.points[0].recorded_at) - new Date(a.points[0].recorded_at));
+      const list = document.getElementById('tripsList');
+      if (tripsArray.length === 0) { list.innerHTML = '<p class="empty">Sin viajes registrados</p>'; return; }
+      list.innerHTML = tripsArray.map(t => `
+        <div class="trip-item" onclick="viewTrip('${t.trip_id}')">
+          <div class="trip-date">🚌 ${new Date(t.points[0].recorded_at).toLocaleString()}</div>
+          <div class="trip-info">${t.points.length} puntos | Vel. máx: ${Math.round(t.max_speed)} km/h</div>
+        </div>`).join('');
+    };
+
+    window.viewTrip = (tripId) => {
+      document.getElementById('tripsList').style.display = 'none';
+      document.getElementById('tripDetail').style.display = 'block';
+      const logs = DB.getLogs().filter(l => l.trip_id === tripId).sort((a, b) => new Date(a.recorded_at) - new Date(b.recorded_at));
+      if (!tripMap) { tripMap = L.map('tripMap').setView([-13.4800, -72.0700], 12); L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(tripMap); }
+      tripMap.eachLayer(layer => { if (layer instanceof L.Polyline || layer instanceof L.Marker) tripMap.removeLayer(layer); });
+      if (logs.length === 0) return;
+      const coords = logs.map(l => [l.lat, l.lng]);
+      L.polyline(coords, { color: '#1976d2', weight: 4, opacity: 0.8 }).addTo(tripMap);
+      L.marker(coords[0], { icon: L.divIcon({ html: '<div style="background:#2e7d32;color:white;padding:4px 8px;border-radius:50%;font-weight:bold;">🟢</div>', className: '', iconSize: [30, 30] }) }).addTo(tripMap).bindPopup('Inicio');
+      L.marker(coords[coords.length - 1], { icon: L.divIcon({ html: '<div style="background:#c62828;color:white;padding:4px 8px;border-radius:50%;font-weight:bold;">🔴</div>', className: '', iconSize: [30, 30] }) }).addTo(tripMap).bindPopup('Fin');
+      logs.filter(l => l.stop_name).forEach(l => { L.marker([l.lat, l.lng]).addTo(tripMap).bindPopup(`<b>${l.stop_name}</b><br>${new Date(l.recorded_at).toLocaleTimeString()}`); });
+      tripMap.fitBounds(L.latLngBounds(coords).pad(0.1));
+    };
+
+    window.backToTrips = () => { document.getElementById('tripsList').style.display = 'block'; document.getElementById('tripDetail').style.display = 'none'; };
+    window.closeHistory = () => { document.getElementById('historyModal').classList.remove('active'); if (tripMap) { tripMap.remove(); tripMap = null; } };
+
+    if (DB.getCurrentUser()) loadApp();
+  </script>
+</body>
+</html>
